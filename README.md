@@ -27,7 +27,7 @@ cd face-mask
 3. Cài thư viện
 
 ```
-pip3 install -r requirements.txt
+pip install -r requirements.txt
 ```
 
 
