@@ -2,6 +2,8 @@
 import cv2
 import numpy as np
 from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing.image import img_to_array
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 from insightface.app import FaceAnalysis
 # --------------------------------------------- #
 
@@ -60,7 +62,7 @@ while True:
     
     # detect face
     faces = app.get(frame)
-    
+    (h, w) = frame.shape[:2]
     for face in faces:
         frame_crop = frame.copy()
         
@@ -69,29 +71,38 @@ while True:
             bounding box (startX, startY, endX, endY)
         """
         bbox = face['bbox'].astype(np.int64)
+        (bbox[1], bbox[3]) = (max(0, bbox[1]), max(0, bbox[3]))
+        (bbox[0], bbox[2]) = (min(w - 1, bbox[0]), min(h - 1, bbox[2]))
+        
         
         # crop image from bounding box
-        frame_crop = frame_crop[bbox[1] - 20 : bbox[3] + 20, bbox[0] - 20 : bbox[2] + 20]
+        frame_crop = frame_crop[bbox[1]: bbox[3], bbox[0]: bbox[2]]
         
-        # resize image because input shape MobileNetV2 is (1, 224, 224, 3)
-        frame_crop = cv2.resize(frame_crop, (224, 224))
-        frame_crop = np.array(frame_crop, dtype= "float32")
-        frame_crop = cv2.cvtColor(frame_crop, cv2.COLOR_BGR2RGB)
-        
-        # current size image is (224, 224, 3)
-        
-        # expand dims image (224, 224, 3) --> (1, 224, 224, 3)
-        frame_crop = np.expand_dims(frame_crop, axis=0)
-        
-        # detect mask
-        mask, _ = maskNet.predict(frame_crop, batch_size = 32)[0]
-        label = "Mask" if mask > 0.9 else "No Mask"
-        color = (0, 255, 0) if label == "Mask" else (0, 0, 255)
-        
-        # draw image and put text
-        draw_border(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2, 10, 10)
-        cv2.putText(frame, label, (bbox[0], bbox[1] - 10),
-			cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 2)
+        if frame_crop.any():
+            # resize image because input shape MobileNetV2 is (1, 224, 224, 3)
+            frame_crop = cv2.cvtColor(frame_crop, cv2.COLOR_BGR2RGB)
+            frame_crop = cv2.resize(frame_crop, (224, 224))
+            frame_crop = img_to_array(frame_crop)
+            frame_crop = preprocess_input(frame_crop)
+            
+            frame_crop = np.array(frame_crop, dtype= "float32")
+            
+            # current size image is (224, 224, 3)
+            
+            # expand dims image (224, 224, 3) --> (1, 224, 224, 3)
+            frame_crop = np.expand_dims(frame_crop, axis=0)
+            
+            # detect mask
+            pred = maskNet.predict(frame_crop, batch_size = 32)
+            mask, withoutmask = pred[0]
+            print(pred)
+            label = "Mask" if mask > withoutmask else "No Mask"
+            color = (0, 255, 0) if label == "Mask" else (0, 0, 255)
+            
+            # draw image and put text
+            draw_border(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2, 10, 10)
+            cv2.putText(frame, label, (bbox[0], bbox[1] - 10),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 2)
         
     cv2.imshow("cam", frame)
     
