@@ -1,5 +1,8 @@
 # face-mask
 
+## Demo
+
+![image](img/_demo.gif)
 
 ## :file_folder: Dataset
 
